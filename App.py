@@ -1,97 +1,65 @@
 import streamlit as st
-import base64
-import fitz  # PyMuPDF für die Suche
+import PyPDF2
 
-# --- SEITEN-SETUP ---
-st.set_page_config(page_title="Spengler Fachregeln", layout="wide", page_icon="⚒️")
+# Funktion zum Laden der PDF
+def load_pdf():
+    with open("path_to_your_pdf_file.pdf", "rb") as f:
+        reader = PyPDF2.PdfReader(f)
+        return reader.pages
 
-# --- CUSTOM DESIGN (Anthrazit & Bronze) ---
-st.markdown("""
-    <style>
-    .stApp { background-color: #1A1A1A; color: #E0E0E0; }
-    section[data-testid="stSidebar"] { background-color: #262626 !important; border-right: 2px solid #CD7F32; }
-    
-    /* Große Bronze-Buttons */
-    div.stButton > button {
-        background-color: #2C2C2C;
-        color: #CD7F32;
-        border: 2px solid #CD7F32;
-        border-radius: 12px;
-        padding: 15px 20px;
-        font-size: 16px;
-        font-weight: bold;
-        width: 100%;
-        margin-bottom: 10px;
-        transition: all 0.3s ease;
-    }
-    div.stButton > button:hover { background-color: #CD7F32; color: #1A1A1A; border: 2px solid #ffffff; }
-    
-    h1, h2, h3 { color: #CD7F32 !important; }
-    .stTextInput > div > div > input { background-color: #2C2C2C; color: white; border: 1px solid #CD7F32; }
-    </style>
-    """, unsafe_allow_html=True)
+# Funktion zum Extrahieren von Text aus PDF
+def extract_text_from_pdf(page):
+    return page.extract_text()
 
-# --- FUNKTIONEN ---
+# Kategorien und Unterkategorien
+categories = {
+    "Einführung": "Die vorliegende Richtlinie bildet die Zusammenfassung des aktuellen Sachstands im Klempnerhandwerk ab.",
+    "Geltungsbereich": "Diese Richtlinien gelten für die Ausführung von Deckungen von Dächern und Bekleidungen von Fassaden.",
+    "Begriffe": "Definitionen wichtiger Fachbegriffe im Klempnerhandwerk.",
+    "Werkstoffe": {
+        "Allgemeines": "Eine ausreichende Produktkennzeichnung ist notwendig.",
+        "Bleche, Bänder und Bauteile": {
+            "Aluminium": "Informationen zu Aluminium blechen...",
+            "Blei": "Details zu Bleiblechen...",
+            # Weitere Materialkategorien hier
+        }
+    },
+    # Weitere Kategorien hier...
+}
 
-def display_pdf_page(file_path, page_number):
-    """Zeigt die PDF-Seite in einem eleganten Frame an."""
-    try:
-        with open(file_path, "rb") as f:
-            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}#page={page_number}" width="100%" height="900" style="border: 2px solid #CD7F32; border-radius: 15px;"></iframe>'
-        st.markdown(pdf_display, unsafe_allow_html=True)
-    except:
-        st.error("Datei 'mitch1.pdf' nicht gefunden. Bitte lade sie hoch!")
+# Streamlit App Layout
+st.title("Klempner Fachregeln")
+st.sidebar.title("Navigation")
 
-def search_pdf(file_path, query):
-    """Durchsucht das Dokument nach Begriffen."""
+# Auswahl der Kategorien
+selected_category = st.sidebar.selectbox("Wähle eine Kategorie:", list(categories.keys()))
+
+# Anzeige der ausgewählten Kategorie
+if selected_category in categories:
+    content = categories[selected_category]
+    if isinstance(content, dict):
+        selected_subcategory = st.selectbox("Wähle eine Unterkategorie:", list(content.keys()))
+        content = content[selected_subcategory]
+    st.write(content)
+
+# Suchfunktion
+st.header("Suchfunktion")
+search_term = st.text_input("Suchbegriff eingeben:")
+if search_term:
+    pages = load_pdf()
     results = []
-    if query:
-        try:
-            doc = fitz.open(file_path)
-            for page_num in range(len(doc)):
-                text = doc[page_num].get_text("text")
-                if query.lower() in text.lower():
-                    results.append(page_num + 1)
-            doc.close()
-        except: pass
-    return results
+    for page in pages:
+        text = extract_text_from_pdf(page)
+        if search_term.lower() in text.lower():
+            results.append(text)
+    if results:
+        st.write("Suchergebnisse:")
+        for result in results:
+            st.write(result)
+    else:
+        st.write("Keine Ergebnisse gefunden.")
 
-# --- LOGIK ---
-
-if 'page' not in st.session_state:
-    st.session_state.page = 1
-
-st.title("⚒️ SPENGLER FACHREGELN")
-
-# Suchleiste
-search_query = st.text_input("🔍 Dokument durchsuchen:", placeholder="z.B. Falz, Traufe, Kupfer...")
-
-col_nav, col_pdf = st.columns([1, 2])
-
-with col_nav:
-    st.markdown("### Navigation")
-    
-    # Große Schaltflächen
-    if st.button("🏠 Startseite"): st.session_state.page = 1
-    if st.button("🧪 3. Werkstoffe"): st.session_state.page = 18
-    if st.button("💧 4. Dachentwässerung"): st.session_state.page = 33
-    if st.button("🏠 5. Metalldächer"): st.session_state.page = 82
-    if st.button("🧱 12. Außenwände"): st.session_state.page = 158
-
-    # Suchergebnisse anzeigen
-    if search_query:
-        st.markdown("---")
-        st.subheader("Suchergebnisse")
-        found_pages = search_pdf("mitch1.pdf", search_query)
-        if found_pages:
-            st.success(f"{len(found_pages)} Treffer gefunden.")
-            selected_res = st.selectbox("Seite wählen:", found_pages)
-            if st.button("Zu Seite springen"):
-                st.session_state.page = selected_res
-        else:
-            st.warning("Keine Treffer.")
-
-with col_pdf:
-    st.subheader(f"Aktuelle Ansicht: Seite {st.session_state.page}")
-    display_pdf_page("mitch1.pdf", st.session_state.page)
+# Original PDF Anzeige
+st.header("Original PDF")
+with open("path_to_your_pdf_file.pdf", "rb") as f:
+    st.download_button(label="Lade die PDF herunter", data=f, file_name="klempner_fachregeln.pdf")
