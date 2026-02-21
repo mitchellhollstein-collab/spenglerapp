@@ -1,91 +1,63 @@
 import streamlit as st
-import fitz  # PyMuPDF
 import base64
 
-# Konfiguration der Seite
-st.set_page_config(page_title="Spengler Fachregeln", layout="wide")
+st.set_page_config(page_title="Spengler Fachregeln App", layout="wide")
 
-# Styling für das mobile Design (Dark Mode & Große Buttons)
-st.markdown("""
-    <style>
-    .stButton>button {
-        width: 100%;
-        height: 60px;
-        font-size: 18px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-    }
-    .search-box {
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        background-color: #0e1117;
-        padding: 10px 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# Funktion zum Anzeigen der PDF-Seite
+def display_pdf_page(file, page_number):
+    with open(file, "rb") as f:
+        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+    # Der Parameter #page=X springt direkt zur Seite
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}#page={page_number}" width="100%" height="800" type="application/pdf"></iframe>'
+    st.markdown(pdf_display, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_pdf():
-    return fitz.open("mitch1.pdf")
+# --- APP STRUKTUR ---
+st.title("⚒️ Fachregel-Navigator Klempnerhandwerk")
 
-doc = load_pdf()
+# Navigation
+st.sidebar.header("Kapitelauswahl")
+kapitel = st.sidebar.radio("Thema wählen:", [
+    "3. Werkstoffe", 
+    "4. Dachentwässerung", 
+    "5. Metalldächer",
+    "12. Außenwandbekleidung"
+])
 
-# Titel & Suche
-st.title("👷 Spengler Fachregeln")
-query = st.text_input("Suchen in 203 Seiten...", placeholder="z.B. Traufblech, Rinnenhalter, Zink")
+# Zuordnung der Startseiten aus deiner mitch1.pdf
+seiten_index = {
+    "3. Werkstoffe": 18,
+    "4. Dachentwässerung": 33,
+    "5. Metalldächer": 82,
+    "12. Außenwandbekleidung": 158
+}
 
-# Hauptmenü (Kategorien)
-if not query:
-    st.subheader("Kategorien")
-    col1, col2 = st.columns(2)
+# TEXT-ANALYSE BEREICH (Oben)
+st.subheader(f"Analyse zu: {kapitel}")
+
+if kapitel == "3. Werkstoffe":
+    st.write("""
+    **Wichtige Eckpunkte aus diesem Kapitel:**
+    - Übersicht der Metalle: Aluminium, Kupfer, Titanzink, Edelstahl.
+    - Korrosionsschutz: Achte auf die Kontaktkorrosion (z.B. Kupfer nicht über verzinktem Stahl).
+    - Längenausdehnung: Wichtige Koeffizienten für die Planung der Dehnungsausgleicher.
+    """)
+    [attachment_0](attachment)
+
+elif kapitel == "4. Dachentwässerung":
+    st.write("""
+    **Wichtige Eckpunkte aus diesem Kapitel:**
+    - Dimensionierung von Dachrinnen und Regenfallrohren.
+    - Befestigungsabstände für Rinnenhalter.
+    - Traufblechausbildungen und Überlappungen.
+    """)
     
-    categories = {
-        "Werkstoffe": 5, 
-        "Dachentwässerung": 35, 
-        "Metalldächer": 85, 
-        "Fassade": 140, 
-        "Löten/Praxis": 180
-    }
-    
-    for i, (name, page) in enumerate(categories.items()):
-        if i % 2 == 0:
-            if col1.button(name):
-                st.session_state.page = page
-        else:
-            if col2.button(name):
-                st.session_state.page = page
 
-# Suchlogik
-if query:
-    st.subheader(f"Suchergebnisse für '{query}':")
-    results = []
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        text = page.get_text()
-        if query.lower() in text.lower():
-            results.append(page_num)
-    
-    if results:
-        for res in results[:10]: # Zeige die ersten 10 Treffer
-            if st.button(f"Gefunden auf Seite {res + 1}"):
-                st.session_state.page = res
-    else:
-        st.error("Nichts gefunden. Versuche einen anderen Begriff.")
+# PDF BEREICH (Unten)
+st.divider()
+st.subheader("📄 Originale PDF-Seite aus dem Regelwerk")
 
-# Anzeige (Option C: Text + PDF Seite)
-if 'page' in st.session_state:
-    p_num = st.session_state.page
-    page = doc.load_page(p_num)
-    
-    st.divider()
-    st.subheader(f"Seite {p_num + 1}")
-    
-    # Text-Extrakt
-    with st.expander("Text-Inhalt anzeigen"):
-        st.write(page.get_text())
-    
-    # PDF-Seite als Bild anzeigen
-    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) # Höhere Auflösung
-    img_data = pix.tobytes("png")
-    st.image(img_data, use_column_width=True)
+# WICHTIG: Die Datei muss im selben Ordner liegen wie das Skript und "mitch1.pdf" heißen
+try:
+    display_pdf_page("mitch1.pdf", seiten_index[kapitel])
+except FileNotFoundError:
+    st.error("Datei 'mitch1.pdf' nicht im Ordner gefunden. Bitte stelle sicher, dass der Dateiname stimmt!")
